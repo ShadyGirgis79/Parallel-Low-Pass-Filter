@@ -3,13 +3,15 @@
 #include <opencv2/opencv.hpp>
 #include <omp.h>
 #include <mpi.h>
+#include <chrono>
 
 using namespace cv;
 using namespace std;
+using namespace chrono;
 
-#define RUN_SEQUENTIAL
+// #define RUN_SEQUENTIAL
 // #define RUN_OPENMP
-// #define RUN_MPI
+#define RUN_MPI
 
 #ifdef RUN_SEQUENTIAL
 
@@ -37,6 +39,9 @@ int main() {
     int pad = kSize / 2;
     int kernelSum = kSize * kSize;
 
+    // Calculating the start time
+    auto start = high_resolution_clock::now();
+
     //Looping on the image
     for (int i = pad; i < image.rows - pad; ++i) {
         for (int j = pad; j < image.cols - pad; ++j) {
@@ -50,9 +55,15 @@ int main() {
         }
     }
 
+    // Calculating the end time
+    auto end = high_resolution_clock::now();
+    duration<double> duration = end - start;
+
     // Save the output
     imwrite("output_blurred.png", output);
-    cout << "\n" << "Blurring completed successfully!Output saved as 'output_blurred.png'" << endl << endl;
+    cout << "\n" << "Blurring completed successfully!Output saved as 'output_blurred.png'" << endl;
+
+    cout << "\nExecution Time: " << duration.count() << " seconds" << endl;
 
     return 0;
 }
@@ -84,6 +95,9 @@ int main() {
     int pad = kSize / 2;
     int kernelSum = kSize * kSize;
 
+    // Calculating the start time
+    auto start = high_resolution_clock::now();
+
 
 #pragma omp parallel for
 
@@ -99,8 +113,15 @@ int main() {
         }
     }
 
+    // Calculating the end time
+    auto end = high_resolution_clock::now();
+    duration<double> duration = end - start;
+
     imwrite("blurred_openmp.png", output);
-    cout << "\n" << "OpenMP Blurring done! Output saved as 'blurred_openmp.png'" << endl << endl;
+    cout << "\n" << "OpenMP Blurring done! Output saved as 'blurred_openmp.png'" << endl;
+
+    cout << "\nExecution Time: " << duration.count() << " seconds" << endl;
+
     return 0;
 }
 
@@ -153,6 +174,9 @@ int main(int argc, char** argv) {
     vector<uchar> local_data(local_data_size);
     vector<uchar> result_data(local_rows * cols);
 
+    // Calculating the start time
+    double start_time = MPI_Wtime();
+
     if (rank == 0) {
         for (int i = 0; i < size; ++i) {
             int start = i * local_rows - pad;
@@ -193,10 +217,15 @@ int main(int argc, char** argv) {
         full_result.data(), local_rows * cols, MPI_UNSIGNED_CHAR,
         0, MPI_COMM_WORLD);
 
+    // Calculating the end time
+    double end_time = MPI_Wtime();
+    double duration = end_time - start_time;
+
     if (rank == 0) {
         Mat blurred(rows, cols, CV_8UC1, full_result.data());
         imwrite("blurred_mpi.png", blurred);
-        cout << "\nMPI Blurring done! Output saved as 'blurred_mpi.png'" << endl << endl;
+        cout << "\nMPI Blurring done! Output saved as 'blurred_mpi.png'" << endl;
+        cout << "\nExecution Time: " << duration << " seconds" << endl;
     }
 
     MPI_Finalize();
