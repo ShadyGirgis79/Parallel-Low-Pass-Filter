@@ -7,16 +7,16 @@
 using namespace cv;
 using namespace std;
 
-// #define RUN_SEQUENTIAL
+#define RUN_SEQUENTIAL
 // #define RUN_OPENMP
-#define RUN_MPI
+// #define RUN_MPI
 
 #ifdef RUN_SEQUENTIAL
 
 int main() {
 
     // Put the path of the image
-    Mat image = imread("lena.png", IMREAD_GRAYSCALE);  
+    Mat image = imread("D:/Projects/Parallel Low Pass Filter/lena.png", IMREAD_GRAYSCALE);  
     
     // Check if the image was loaded successfully
     if (image.empty()) {
@@ -25,15 +25,18 @@ int main() {
     }
 
     Mat output = image.clone();
-    int kernel[3][3] = {
-        {1, 1, 1},
-        {1, 1, 1},
-        {1, 1, 1}
-    };
 
-    int kSize = 3;
-    int kernelSum = 9;
+    int kSize;
+
+    do {
+        cout << "Enter odd kernel size : ";
+        cin >> kSize;
+    } 
+    while (kSize % 2 == 0 || kSize < 3);
+
     int pad = kSize / 2;
+    int kernelSum = kSize * kSize;
+
 
     for (int i = pad; i < image.rows - pad; ++i) {
         for (int j = pad; j < image.cols - pad; ++j) {
@@ -62,7 +65,7 @@ int main() {
 int main() {
 
     // Put the path of the image
-    Mat image = imread("lena.png", IMREAD_GRAYSCALE);
+    Mat image = imread("D:/Projects/Parallel Low Pass Filter/lena.png", IMREAD_GRAYSCALE);
 
     if (image.empty()) {
         cout << "Error: Could not open or find the image!" << endl;
@@ -70,13 +73,17 @@ int main() {
     }
 
     Mat output = image.clone();
-    int kernel[3][3] = {
-        {1, 1, 1},
-        {1, 1, 1},
-        {1, 1, 1}
-    };
 
-    int kSize = 3, pad = kSize / 2, kernelSum = 9;
+    int kSize;
+
+    do {
+        cout << "Enter odd kernel size : ";
+        cin >> kSize;
+    } while (kSize % 2 == 0 || kSize < 3);
+
+    int pad = kSize / 2;
+    int kernelSum = kSize * kSize;
+
 
 #pragma omp parallel for
 
@@ -109,16 +116,30 @@ int main(int argc, char** argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     Mat image;
+    int kSize = 3;  // Default kernel size
+
     if (rank == 0) {
+        do {
+            cout << "Enter odd kernel size : ";
+            cin >> kSize;
+
+        } while (kSize % 2 == 0 || kSize < 3);
         
-        // Put the path of the image
-        image = imread("D:/Programming Practice/C++/High Preformance Computing/Parallel Low Pass Filter/lena.png", IMREAD_GRAYSCALE);
+
+        // Load the image in grayscale
+        image = imread("D:/Projects/Parallel Low Pass Filter/lena.png", IMREAD_GRAYSCALE);
         if (image.empty()) {
-            cout << "Error: Image not loaded!" << endl ;
+            cout << "Error: Image not loaded!" << endl;
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
     }
 
+    // Broadcast the kernel size to all processes
+    MPI_Bcast(&kSize, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    int pad = kSize / 2;
+    int kernelSum = kSize * kSize;
+
+    // Broadcast image dimensions
     int rows = 0, cols = 0;
     if (rank == 0) {
         rows = image.rows;
@@ -128,9 +149,7 @@ int main(int argc, char** argv) {
     MPI_Bcast(&cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     int local_rows = rows / size;
-    int pad = 1;
     int local_data_size = (local_rows + 2 * pad) * cols;
-
     vector<uchar> local_data(local_data_size);
     vector<uchar> result_data(local_rows * cols);
 
@@ -163,7 +182,7 @@ int main(int argc, char** argv) {
                     sum += local_data[idx];
                 }
             }
-            result_data[(i - pad) * cols + j] = sum / 9;
+            result_data[(i - pad) * cols + j] = sum / kernelSum;
         }
     }
 
@@ -177,7 +196,7 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         Mat blurred(rows, cols, CV_8UC1, full_result.data());
         imwrite("blurred_mpi.png", blurred);
-        cout << "MPI Blurring done! Output saved as 'blurred_mpi.png'" << endl << endl;
+        cout << "\nMPI Blurring done! Output saved as 'blurred_mpi.png'" << endl << endl;
     }
 
     MPI_Finalize();
