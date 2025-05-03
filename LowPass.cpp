@@ -37,7 +37,7 @@ int main() {
     int pad = kSize / 2;
     int kernelSum = kSize * kSize;
 
-
+    //Looping on the image
     for (int i = pad; i < image.rows - pad; ++i) {
         for (int j = pad; j < image.cols - pad; ++j) {
             int sum = 0;
