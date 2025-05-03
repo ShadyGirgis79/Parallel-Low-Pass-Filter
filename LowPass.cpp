@@ -1,0 +1,190 @@
+﻿
+#include <iostream>
+#include <opencv2/opencv.hpp>
+#include <omp.h>
+#include <mpi.h>
+
+using namespace cv;
+using namespace std;
+
+// #define RUN_SEQUENTIAL
+// #define RUN_OPENMP
+#define RUN_MPI
+
+#ifdef RUN_SEQUENTIAL
+
+int main() {
+
+    // Put the path of the image
+    Mat image = imread("lena.png", IMREAD_GRAYSCALE);  
+    
+    // Check if the image was loaded successfully
+    if (image.empty()) {
+        cout << "Error: Could not open or find the image!" << endl;
+        return -1;
+    }
+
+    Mat output = image.clone();
+    int kernel[3][3] = {
+        {1, 1, 1},
+        {1, 1, 1},
+        {1, 1, 1}
+    };
+
+    int kSize = 3;
+    int kernelSum = 9;
+    int pad = kSize / 2;
+
+    for (int i = pad; i < image.rows - pad; ++i) {
+        for (int j = pad; j < image.cols - pad; ++j) {
+            int sum = 0;
+            for (int ki = -pad; ki <= pad; ++ki) {
+                for (int kj = -pad; kj <= pad; ++kj) {
+                    sum += image.at<uchar>(i + ki, j + kj);
+                }
+            }
+            output.at<uchar>(i, j) = sum / kernelSum;
+        }
+    }
+
+    // Save the output
+    imwrite("output_blurred.png", output);
+    cout << "\n" << "Blurring completed successfully!Output saved as 'output_blurred.png'" << endl << endl;
+
+    return 0;
+}
+
+#endif
+
+
+#ifdef RUN_OPENMP
+
+int main() {
+
+    // Put the path of the image
+    Mat image = imread("lena.png", IMREAD_GRAYSCALE);
+
+    if (image.empty()) {
+        cout << "Error: Could not open or find the image!" << endl;
+        return -1;
+    }
+
+    Mat output = image.clone();
+    int kernel[3][3] = {
+        {1, 1, 1},
+        {1, 1, 1},
+        {1, 1, 1}
+    };
+
+    int kSize = 3, pad = kSize / 2, kernelSum = 9;
+
+#pragma omp parallel for
+
+    for (int i = pad; i < image.rows - pad; ++i) {
+        for (int j = pad; j < image.cols - pad; ++j) {
+            int sum = 0;
+            for (int ki = -pad; ki <= pad; ++ki) {
+                for (int kj = -pad; kj <= pad; ++kj) {
+                    sum += image.at<uchar>(i + ki, j + kj);
+                }
+            }
+            output.at<uchar>(i, j) = sum / kernelSum;
+        }
+    }
+
+    imwrite("blurred_openmp.png", output);
+    cout << "\n" << "OpenMP Blurring done! Output saved as 'blurred_openmp.png'" << endl << endl;
+    return 0;
+}
+
+#endif
+
+
+#ifdef RUN_MPI
+
+int main(int argc, char** argv) {
+    MPI_Init(&argc, &argv);
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    Mat image;
+    if (rank == 0) {
+        
+        // Put the path of the image
+        image = imread("D:/Programming Practice/C++/High Preformance Computing/Parallel Low Pass Filter/lena.png", IMREAD_GRAYSCALE);
+        if (image.empty()) {
+            cout << "Error: Image not loaded!" << endl ;
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+    }
+
+    int rows = 0, cols = 0;
+    if (rank == 0) {
+        rows = image.rows;
+        cols = image.cols;
+    }
+    MPI_Bcast(&rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    int local_rows = rows / size;
+    int pad = 1;
+    int local_data_size = (local_rows + 2 * pad) * cols;
+
+    vector<uchar> local_data(local_data_size);
+    vector<uchar> result_data(local_rows * cols);
+
+    if (rank == 0) {
+        for (int i = 0; i < size; ++i) {
+            int start = i * local_rows - pad;
+            if (start < 0) start = 0;
+            int length = local_rows + 2 * pad;
+            if (start + length > rows) length = rows - start;
+
+            Mat part = image.rowRange(start, start + length);
+            if (i == 0) {
+                memcpy(local_data.data(), part.data, length * cols);
+            }
+            else {
+                MPI_Send(part.data, length * cols, MPI_UNSIGNED_CHAR, i, 0, MPI_COMM_WORLD);
+            }
+        }
+    }
+    else {
+        MPI_Recv(local_data.data(), local_data_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    }
+
+    for (int i = pad; i < local_rows + pad; ++i) {
+        for (int j = pad; j < cols - pad; ++j) {
+            int sum = 0;
+            for (int ki = -pad; ki <= pad; ++ki) {
+                for (int kj = -pad; kj <= pad; ++kj) {
+                    int idx = (i + ki) * cols + (j + kj);
+                    sum += local_data[idx];
+                }
+            }
+            result_data[(i - pad) * cols + j] = sum / 9;
+        }
+    }
+
+    vector<uchar> full_result;
+    if (rank == 0) full_result.resize(rows * cols);
+
+    MPI_Gather(result_data.data(), local_rows * cols, MPI_UNSIGNED_CHAR,
+        full_result.data(), local_rows * cols, MPI_UNSIGNED_CHAR,
+        0, MPI_COMM_WORLD);
+
+    if (rank == 0) {
+        Mat blurred(rows, cols, CV_8UC1, full_result.data());
+        imwrite("blurred_mpi.png", blurred);
+        cout << "MPI Blurring done! Output saved as 'blurred_mpi.png'" << endl << endl;
+    }
+
+    MPI_Finalize();
+    return 0;
+}
+
+#endif
+
+
+
