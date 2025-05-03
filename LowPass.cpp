@@ -7,16 +7,16 @@
 using namespace cv;
 using namespace std;
 
-// #define RUN_SEQUENTIAL
+#define RUN_SEQUENTIAL
 // #define RUN_OPENMP
-#define RUN_MPI
+// #define RUN_MPI
 
 #ifdef RUN_SEQUENTIAL
 
 int main() {
 
     // Put the path of the image
-    Mat image = imread("lena.png", IMREAD_GRAYSCALE);  
+    Mat image = imread("D:/Projects/Parallel Low Pass Filter/lena.png", IMREAD_GRAYSCALE);  
     
     // Check if the image was loaded successfully
     if (image.empty()) {
@@ -62,7 +62,7 @@ int main() {
 int main() {
 
     // Put the path of the image
-    Mat image = imread("lena.png", IMREAD_GRAYSCALE);
+    Mat image = imread("D:/Projects/Parallel Low Pass Filter/lena.png", IMREAD_GRAYSCALE);
 
     if (image.empty()) {
         cout << "Error: Could not open or find the image!" << endl;
@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         
         // Put the path of the image
-        image = imread("D:/Programming Practice/C++/High Preformance Computing/Parallel Low Pass Filter/lena.png", IMREAD_GRAYSCALE);
+        image = imread("D:/Projects/Parallel Low Pass Filter/lena.png", IMREAD_GRAYSCALE);
         if (image.empty()) {
             cout << "Error: Image not loaded!" << endl ;
             MPI_Abort(MPI_COMM_WORLD, -1);
@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
     if (rank == 0) {
         Mat blurred(rows, cols, CV_8UC1, full_result.data());
         imwrite("blurred_mpi.png", blurred);
-        cout << "MPI Blurring done! Output saved as 'blurred_mpi.png'" << endl << endl;
+        cout <<"\n" << "MPI Blurring done! Output saved as 'blurred_mpi.png'" << endl << endl;
     }
 
     MPI_Finalize();
