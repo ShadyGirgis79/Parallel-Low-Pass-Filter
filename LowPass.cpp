@@ -9,9 +9,9 @@ using namespace cv;
 using namespace std;
 using namespace chrono;
 
-// #define RUN_SEQUENTIAL
+#define RUN_SEQUENTIAL
 // #define RUN_OPENMP
-#define RUN_MPI
+// #define RUN_MPI
 
 #ifdef RUN_SEQUENTIAL
 
@@ -27,7 +27,6 @@ int main() {
     }
 
     Mat output = image.clone();
-
     int kSize;
 
     do {
@@ -43,11 +42,12 @@ int main() {
     auto start = high_resolution_clock::now();
 
     //Looping on the image
-    for (int i = pad; i < image.rows - pad; ++i) {
-        for (int j = pad; j < image.cols - pad; ++j) {
+    for (int i = pad; i < image.rows - pad; i++) {
+        for (int j = pad; j < image.cols - pad; j++) {
             int sum = 0;
-            for (int ki = -pad; ki <= pad; ++ki) {
-                for (int kj = -pad; kj <= pad; ++kj) {
+            // Looping on the filter to always make it centered
+            for (int ki = -pad; ki <= pad; ki++) {
+                for (int kj = -pad; kj <= pad; kj++) {
                     sum += image.at<uchar>(i + ki, j + kj);
                 }
             }
@@ -64,6 +64,12 @@ int main() {
     cout << "\n" << "Blurring completed successfully!Output saved as 'output_blurred.png'" << endl;
 
     cout << "\nExecution Time: " << duration.count() << " seconds" << endl;
+
+    // Show images
+    imshow("Original Image", image);
+    imshow("Blurred Image", output);
+    waitKey(0);
+    destroyAllWindows();
 
     return 0;
 }
@@ -101,11 +107,13 @@ int main() {
 
 #pragma omp parallel for
 
-    for (int i = pad; i < image.rows - pad; ++i) {
-        for (int j = pad; j < image.cols - pad; ++j) {
+    //Looping on the image
+    for (int i = pad; i < image.rows - pad; i++) {
+        for (int j = pad; j < image.cols - pad; j++) {
             int sum = 0;
-            for (int ki = -pad; ki <= pad; ++ki) {
-                for (int kj = -pad; kj <= pad; ++kj) {
+            // Looping on the filter to always make it centered
+            for (int ki = -pad; ki <= pad; ki++) {
+                for (int kj = -pad; kj <= pad; kj++) {
                     sum += image.at<uchar>(i + ki, j + kj);
                 }
             }
@@ -121,6 +129,12 @@ int main() {
     cout << "\n" << "OpenMP Blurring done! Output saved as 'blurred_openmp.png'" << endl;
 
     cout << "\nExecution Time: " << duration.count() << " seconds" << endl;
+
+    // Show images
+    imshow("Original Image", image);
+    imshow("Blurred Image", output);
+    waitKey(0);
+    destroyAllWindows();
 
     return 0;
 }
@@ -197,11 +211,13 @@ int main(int argc, char** argv) {
         MPI_Recv(local_data.data(), local_data_size, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
-    for (int i = pad; i < local_rows + pad; ++i) {
-        for (int j = pad; j < cols - pad; ++j) {
+    //Looping on the image
+    for (int i = pad; i < local_rows + pad; i++) {
+        for (int j = pad; j < cols - pad; j++) {
             int sum = 0;
-            for (int ki = -pad; ki <= pad; ++ki) {
-                for (int kj = -pad; kj <= pad; ++kj) {
+            // Looping on the filter to always make it centered
+            for (int ki = -pad; ki <= pad; ki++) {
+                for (int kj = -pad; kj <= pad; kj++) {
                     int idx = (i + ki) * cols + (j + kj);
                     sum += local_data[idx];
                 }
@@ -226,6 +242,12 @@ int main(int argc, char** argv) {
         imwrite("blurred_mpi.png", blurred);
         cout << "\nMPI Blurring done! Output saved as 'blurred_mpi.png'" << endl;
         cout << "\nExecution Time: " << duration << " seconds" << endl;
+
+        // Show images
+        imshow("Original Image", image);
+        imshow("Blurred Image", output);
+        waitKey(0);
+        destroyAllWindows();
     }
 
     MPI_Finalize();
