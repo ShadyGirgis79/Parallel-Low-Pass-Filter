@@ -9,8 +9,8 @@ using namespace cv;
 using namespace std;
 using namespace chrono;
 
-#define RUN_SEQUENTIAL
-// #define RUN_OPENMP
+// #define RUN_SEQUENTIAL
+#define RUN_OPENMP
 // #define RUN_MPI
 
 #ifdef RUN_SEQUENTIAL
@@ -45,6 +45,8 @@ int main() {
     for (int i = pad; i < image.rows - pad; i++) {
         for (int j = pad; j < image.cols - pad; j++) {
             int sum = 0;
+
+            // Kernel application
             // Looping on the filter to always make it centered
             for (int ki = -pad; ki <= pad; ki++) {
                 for (int kj = -pad; kj <= pad; kj++) {
@@ -63,7 +65,7 @@ int main() {
     imwrite("output_blurred.png", output);
     cout << "\n" << "Blurring completed successfully!Output saved as 'output_blurred.png'" << endl;
 
-    cout << "\nExecution Time: " << duration.count() << " seconds" << endl;
+    cout << "\nExecution Time: " << duration.count() << " seconds" << endl << endl;
 
     // Show images
     imshow("Original Image", image);
@@ -80,10 +82,8 @@ int main() {
 #ifdef RUN_OPENMP
 
 int main() {
-
-    // Put the path of the image
+    // Load grayscale image
     Mat image = imread("D:/Projects/Parallel Low Pass Filter/lena.png", IMREAD_GRAYSCALE);
-
     if (image.empty()) {
         cout << "Error: Could not open or find the image!" << endl;
         return -1;
@@ -92,9 +92,8 @@ int main() {
     Mat output = image.clone();
 
     int kSize;
-
     do {
-        cout << "Enter odd kernel size : ";
+        cout << "Enter odd kernel size: ";
         cin >> kSize;
     } while (kSize % 2 == 0 || kSize < 3);
 
@@ -104,19 +103,21 @@ int main() {
     // Calculating the start time
     auto start = high_resolution_clock::now();
 
-
-#pragma omp parallel for
-
+    // Parallelizing with OpenMP
     //Looping on the image
+    #pragma omp parallel for collapse(2)
     for (int i = pad; i < image.rows - pad; i++) {
         for (int j = pad; j < image.cols - pad; j++) {
             int sum = 0;
+
+            // Kernel application
             // Looping on the filter to always make it centered
             for (int ki = -pad; ki <= pad; ki++) {
                 for (int kj = -pad; kj <= pad; kj++) {
                     sum += image.at<uchar>(i + ki, j + kj);
                 }
             }
+
             output.at<uchar>(i, j) = sum / kernelSum;
         }
     }
@@ -126,9 +127,8 @@ int main() {
     duration<double> duration = end - start;
 
     imwrite("blurred_openmp.png", output);
-    cout << "\n" << "OpenMP Blurring done! Output saved as 'blurred_openmp.png'" << endl;
-
-    cout << "\nExecution Time: " << duration.count() << " seconds" << endl;
+    cout << "\nOpenMP Blurring done! Output saved as 'blurred_openmp.png'" << endl;
+    cout << "Execution Time: " << duration.count() << " seconds" << endl << endl;
 
     // Show images
     imshow("Original Image", image);
@@ -215,6 +215,8 @@ int main(int argc, char** argv) {
     for (int i = pad; i < local_rows + pad; i++) {
         for (int j = pad; j < cols - pad; j++) {
             int sum = 0;
+
+            // Kernel application
             // Looping on the filter to always make it centered
             for (int ki = -pad; ki <= pad; ki++) {
                 for (int kj = -pad; kj <= pad; kj++) {
@@ -241,11 +243,11 @@ int main(int argc, char** argv) {
         Mat blurred(rows, cols, CV_8UC1, full_result.data());
         imwrite("blurred_mpi.png", blurred);
         cout << "\nMPI Blurring done! Output saved as 'blurred_mpi.png'" << endl;
-        cout << "\nExecution Time: " << duration << " seconds" << endl;
+        cout << "\nExecution Time: " << duration << " seconds" << endl << endl;
 
         // Show images
         imshow("Original Image", image);
-        imshow("Blurred Image", output);
+        imshow("Blurred Image", blurred);
         waitKey(0);
         destroyAllWindows();
     }
